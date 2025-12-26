@@ -1,13 +1,10 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 
-# Railway Variables থেকে Token নেবে
-8234194379:AAGlt-BzhP7EmJTNmMvAI27AcCK5Ncb0wfU = os.getenv("8234194379:AAGlt-BzhP7EmJTNmMvAI27AcCK5Ncb0wfU")
-
-# তোমার নিজের রিপোর্ট URL
+BOT_TOKEN = os.getenv("8234194379:AAGlt-BzhP7EmJTNmMvAI27AcCK5Ncb0wfU")
 REPORT_URL = "http://94.23.120.156/ints/agent/SMSCDRStats"
 
 def get_sms_report():
@@ -15,41 +12,39 @@ def get_sms_report():
     response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
-
-    # পুরো পেজ থেকে টেক্সট নেবে
     text = soup.get_text(separator="\n")
-
-    # ফাঁকা লাইন বাদ
     lines = [l.strip() for l in text.splitlines() if l.strip()]
-
-    # Telegram message ছোট রাখতে
     report = "\n".join(lines[:25])
-
     return report
 
-
+# Start command with inline button
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📊 SMS CDR Report Bot\n\n"
-        "রিপোর্ট দেখতে 👉 /report লিখুন"
-    )
+    keyboard = [
+        [InlineKeyboardButton("📈 Show Report", callback_data="report")],
+        [InlineKeyboardButton("ℹ️ Help", callback_data="help")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Welcome! Choose an option:", reply_markup=reply_markup)
 
+# Callback for button clicks
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        data = get_sms_report()
-        await update.message.reply_text(
-            f"📈 Latest SMS Report:\n\n{data}"
-        )
-    except Exception:
-        await update.message.reply_text(
-            "❌ রিপোর্ট আনতে সমস্যা হয়েছে"
-        )
+    if query.data == "report":
+        try:
+            data = get_sms_report()
+            await query.edit_message_text(f"📊 Latest SMS Report:\n\n{data}")
+        except Exception:
+            await query.edit_message_text("❌ Could not fetch report")
+    elif query.data == "help":
+        await query.edit_message_text("Use the 📈 Show Report button to see the latest SMS report")
 
-
-app = ApplicationBuilder().token(BOT_TOKEN).build()
+# Telegram bot setup
+app = ApplicationBuilder().token(8234194379:AAGlt-BzhP7EmJTNmMvAI27AcCK5Ncb0wfU).build()
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("report", report))
+app.add_handler(CallbackQueryHandler(button_callback))
 
 print("Bot is running...")
 app.run_polling()
+
